@@ -1,0 +1,1 @@
+import {request,post} from './client';import type {PeriodComparison} from '../types/domain';export const getComparisons=()=>request<PeriodComparison[]>('/comparisons');export const createComparison=(data:unknown)=>post<PeriodComparison>('/comparisons',data);

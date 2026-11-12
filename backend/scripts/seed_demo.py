@@ -4,6 +4,9 @@ from src.config.database import Base,engine,Session
 from src.models import User,BenchmarkSet,Venue,PeriodObservation,EfficiencyRun,ImprovementCase
 from src.utils.security import hash_password
 from src.services.run_service import execute_run
+from src.services.comparison_service import create_comparison, execute_comparison
+from src.schemas.comparison import ComparisonInput
+from src.models import PeriodComparison
 
 def seed():
     Base.metadata.create_all(engine);rng=random.Random(91)
@@ -28,9 +31,14 @@ def seed():
             runname=period+' · 双投入双产出CCR'
             if not db.scalar(select(EfficiencyRun).where(EfficiencyRun.name==runname)):
                 run=EfficiencyRun(name=runname,benchmark_id=benchmark.id,inputs=['staff_hours','energy_cost'],outputs=['visits','programs'],sensitivity_count=3,status='queued');db.add(run);db.commit();execute_run(db,run.id)
+        sets=db.scalars(select(BenchmarkSet).order_by(BenchmarkSet.period)).all()
+        comparison_name='2026Q2→Q3 · 跨期生产率分解'
+        if len(sets)>=2 and not db.scalar(select(PeriodComparison).where(PeriodComparison.name==comparison_name)):
+            item=create_comparison(db,ComparisonInput(name=comparison_name,before_benchmark_id=sets[0].id,after_benchmark_id=sets[1].id,inputs=['staff_hours','energy_cost'],outputs=['visits','programs']))
+            execute_comparison(db,item.id)
         latest=db.scalar(select(EfficiencyRun).order_by(EfficiencyRun.id.desc()))
         if latest and latest.status=='completed' and not db.scalar(select(ImprovementCase).where(ImprovementCase.title=='水岸青年馆 · 开放时段与照明排程复核')):
             target=next(r for r in latest.result['baseline'] if r['venue_code']=='QY-05')
             db.add(ImprovementCase(title='水岸青年馆 · 开放时段与照明排程复核',run_id=latest.id,observation_id=target['observation_id'],hypothesis='先复核同期开馆工时与照明排程的统计边界，再用活动日观察验证投入缩减假设。',verification='由机构联络员核对季度口径，安排两周现场观察；不作为个人绩效、自动拨款或直接预算削减依据。',status='approved',approved_by='admin@qiyuan.demo'))
-        db.commit();print(json.dumps({m.__tablename__:db.scalar(select(func.count()).select_from(m)) for m in (User,BenchmarkSet,Venue,PeriodObservation,EfficiencyRun,ImprovementCase)},ensure_ascii=False))
+        db.commit();print(json.dumps({m.__tablename__:db.scalar(select(func.count()).select_from(m)) for m in (User,BenchmarkSet,Venue,PeriodObservation,EfficiencyRun,ImprovementCase,PeriodComparison)},ensure_ascii=False))
 if __name__=='__main__':seed()

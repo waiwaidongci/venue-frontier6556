@@ -5,3 +5,4 @@ from .venue import Venue
 from .observation import PeriodObservation
 from .run import EfficiencyRun
 from .case import ImprovementCase
+from .comparison import PeriodComparison
